@@ -43,12 +43,15 @@ def main_index():
 @app.route("/post/<post_id>")
 def get_post(post_id):
 
+    post_id = int(post_id)
+
     post_data = post_db.find_one({"post_id" : post_id})
 
 
 
-
     post_url = s3_client.generate_presigned_url("get_object", Params={"Bucket" : AWS_GIFBUCKET, "Key" : post_data["image_name"]}, ExpiresIn=100)
+
+    del post_data["_id"]
 
     post_data["post_url"] = post_url
 
