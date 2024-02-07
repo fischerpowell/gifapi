@@ -2,3 +2,4 @@ Flask
 Gunicorn
 boto3
 python-dotenv
+pymongo[srv]
