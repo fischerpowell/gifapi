@@ -44,24 +44,75 @@ def main_index():
 
 @app.route("/post/<post_id>")
 def get_post(post_id):
+    session_user_id = 1
 
     post_id = int(post_id)
 
-    post_data = post_db.find_one({"post_id" : post_id}, {"_id" : 0})
+    pipeline = [
+        {
+            "$match" : {
+                "post_id" : post_id
+            }
+        },
+        {
+            "$lookup" : {
+                "from" : "users",
+                "localField" : "user_id",
+                "foreignField" : "user_id",
+                "as" : "user_record",
+            }
+        },
+        {
+            "$unwind" : "$user_record"
+        },
+        {
+            "$addFields" : {
+                "comment_count" : {
+                    "$size" : "$comments"
+                },
+                "user_liked" : {
+                    "$in" : [session_user_id, "$likes"]
+                }
+            },
 
-    user_data = user_db.find_one({"user_id" : post_data["user_id"]}, {"username" : 1, "picture_name" : 1, "name_color" : 1, "_id" : 0})
+        },
+        {
+            "$project" : {
+                "post_id" : 1,
+                "user_id" : 1,
+                "width" : 1,
+                "height" : 1,
+                "image_name" : 1,
+                "title" : 1,
+                "caption" : 1,
+                "tags" : 1,
+                "comment_count" : 1,
+                "user_liked" : 1,
+                "name_color" : "$user_record.name_color",
+                "username" : "$user_record.username",
+                "picture_name" : "$user_record.picture_name",
+                "date" : 1,
+                "circle" : 1,
+                "_id" : 0,
+
+            }
+        },
+
+    ]
+
+    post_data = list(post_db.aggregate(pipeline))[0]
+
 
 
     post_url = s3_client.generate_presigned_url("get_object", Params={"Bucket" : AWS_GIFBUCKET, "Key" : post_data["image_name"]}, ExpiresIn=100)
 
 
-    picture_url = s3_client.generate_presigned_url("get_object", Params={"Bucket" : AWS_USERBUCKET, "Key" : user_data["picture_name"]}, ExpiresIn=100)
+    picture_url = s3_client.generate_presigned_url("get_object", Params={"Bucket" : AWS_USERBUCKET, "Key" : post_data["picture_name"]}, ExpiresIn=100)
 
     post_data["post_url"] = post_url
 
-    user_data["picture_url"] = picture_url
+    post_data["picture_url"] = picture_url
 
-    post_data = {**post_data, **user_data}
 
     return jsonify(post_data)
 
