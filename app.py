@@ -19,6 +19,60 @@ AWS_USERBUCKET = os.environ.get("AWS_USERBUCKET")
 MONGO_USER = os.environ.get("MONGO_USER")
 MONGO_PW = os.environ.get("MONGO_PW")
 
+
+
+class CachedLink:
+    def __init__(self, link, created):
+        self.link = link
+        self.created = created
+
+class LinkCache:
+    def __init__(self, link_duration, bucket=None, sec_buffer=15):
+        self.link_duration = link_duration
+        self.bucket = bucket
+        self.sec_buffer = sec_buffer
+
+        self.cache = {}
+
+    def add_link(self, image_name):
+        if self.bucket:
+            link = s3_client.generate_presigned_url("get_object", Params={"Bucket" : self.bucket, "Key" : image_name}, ExpiresIn=self.link_duration)
+        self.cache[image_name] = CachedLink(link, datetime.datetime.now(tz=datetime.timezone.utc))
+        return link
+
+    def get_link(self, image_name):
+        try:
+            link_item = self.cache[image_name]
+            if self.check_timedelta(link_item.created):
+                return link_item.link
+            else:
+                self.validate_cache()
+                return self.add_link(image_name)
+
+        except KeyError:
+            self.validate_cache()
+            return self.add_link(image_name)
+
+
+    def check_timedelta(self, created):
+        current_time = datetime.datetime.now(tz=datetime.timezone.utc)
+        expires_by = created + datetime.timedelta(seconds=(self.link_duration - self.sec_buffer))
+        if current_time < expires_by:
+            return True
+        else:
+            return False
+
+
+    def validate_cache(self):
+        remove_names = []
+        for image_name, link_item in self.cache.items():
+            if not self.check_timedelta(link_item.created):
+                remove_names.append(image_name)
+        for name in remove_names:
+            del self.cache[name]
+    
+
+
 s3_client = boto3.client("s3",
     aws_access_key_id=AWS_KEY,
     aws_secret_access_key=AWS_SECRET,
@@ -36,6 +90,8 @@ user_db = mongo_client.gifcluster.users
 
 app = Flask(__name__)
 
+post_cache = LinkCache(100, AWS_GIFBUCKET)
+user_cache = LinkCache(100, AWS_USERBUCKET)
 
 @app.route('/')
 def main_index():
@@ -108,10 +164,10 @@ def get_post(post_id):
 
 
 
-    post_url = s3_client.generate_presigned_url("get_object", Params={"Bucket" : AWS_GIFBUCKET, "Key" : post_data["image_name"]}, ExpiresIn=100)
+    post_url = post_cache.get_link(post_data["image_name"])
 
 
-    picture_url = s3_client.generate_presigned_url("get_object", Params={"Bucket" : AWS_USERBUCKET, "Key" : post_data["picture_name"]}, ExpiresIn=100)
+    picture_url = user_cache.get_link(post_data["picture_name"])
 
     post_data["post_url"] = post_url
 
