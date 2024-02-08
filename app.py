@@ -72,6 +72,9 @@ def get_post(post_id):
                 },
                 "user_liked" : {
                     "$in" : [session_user_id, "$likes"]
+                },
+                "like_count" : {
+                    "$size" : "$likes"
                 }
             },
 
@@ -87,6 +90,7 @@ def get_post(post_id):
                 "caption" : 1,
                 "tags" : 1,
                 "comment_count" : 1,
+                "like_count" : 1,
                 "user_liked" : 1,
                 "name_color" : "$user_record.name_color",
                 "username" : "$user_record.username",
