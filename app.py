@@ -15,6 +15,7 @@ AWS_SECRET = os.environ.get("AWS_ACCESS_KEY_SECRET")
 AWS_REGION = os.environ.get("AWS_REGION")
 AWS_SIGVERSION = os.environ.get("AWS_SIGVERSION")
 AWS_GIFBUCKET = os.environ.get("AWS_GIFBUCKET")
+AWS_USERBUCKET = os.environ.get("AWS_USERBUCKET")
 MONGO_USER = os.environ.get("MONGO_USER")
 MONGO_PW = os.environ.get("MONGO_PW")
 
@@ -31,6 +32,7 @@ mongo_client = MongoClient(mongo_uri, server_api=ServerApi('1'))
 
 
 post_db = mongo_client.gifcluster.posts
+user_db = mongo_client.gifcluster.users
 
 app = Flask(__name__)
 
@@ -45,15 +47,21 @@ def get_post(post_id):
 
     post_id = int(post_id)
 
-    post_data = post_db.find_one({"post_id" : post_id})
+    post_data = post_db.find_one({"post_id" : post_id}, {"_id" : 0})
 
+    user_data = user_db.find_one({"user_id" : post_data["user_id"]}, {"username" : 1, "picture_name" : 1, "name_color" : 1, "_id" : 0})
 
 
     post_url = s3_client.generate_presigned_url("get_object", Params={"Bucket" : AWS_GIFBUCKET, "Key" : post_data["image_name"]}, ExpiresIn=100)
 
-    del post_data["_id"]
+
+    picture_url = s3_client.generate_presigned_url("get_object", Params={"Bucket" : AWS_USERBUCKET, "Key" : user_data["picture_name"]}, ExpiresIn=100)
 
     post_data["post_url"] = post_url
+
+    user_data["picture_url"] = picture_url
+
+    post_data = {**post_data, **user_data}
 
     return jsonify(post_data)
 
