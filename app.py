@@ -181,10 +181,12 @@ def get_feed(last_id):
     session_user_id = 1
 
 
+    user_record = user_db.find_one({"user_id" : session_user_id})
+
     last_id = int(last_id)
     if last_id == 0:
         match = {
-            "$expr" : {"$in" : ["$user_id", "$user_record.circles"]},
+            "$expr" : {"$in" : ["$user_id", user_record["circles"]]},
 
 
             }
@@ -192,7 +194,7 @@ def get_feed(last_id):
         date = post_db.find_one({"post_id" : last_id})["date"]
         print(date)
         match = {
-                "$expr" : {"$in" : ["$user_id", "$user_record.circles"]},
+                "$expr" : {"$in" : ["$user_id", user_record["circles"]]},
                 "$expr" : {"$lt" : ["$date", date]}
             }
         
@@ -200,43 +202,6 @@ def get_feed(last_id):
 
 
     pipeline = [
-
-        {
-            "$lookup" : {
-                "from" : "users",
-                "localField" : "user_id",
-                "foreignField" : "user_id",
-                "as" : "user_record",
-            }
-        },
-        {
-            "$unwind" : "$user_record"
-        },
-        # {
-        #     "$lookup" : {
-        #         "from" : "posts",
-        #         "localField" : "post_id",
-        #         "foreignField" : "post_id",
-        #         "pipeline" : [
-        #             {"$match" : {
-        #                 "post_id" : last_id
-        #             }
-        #             },
-        #             {
-        #                 "$project" : {
-        #                     "_id" : 0,
-        #                 }
-        #             }
-        #         ],
-        #         "as" : "last_post",
-        #     }
-        # },
-
-        # {
-        #     "$unwind" : {"path" : "$last_post",
-        #                  "preserveNullAndEmptyArrays" : True},
-            
-        # },
 
         {
             "$match" : match
@@ -286,9 +251,9 @@ def get_feed(last_id):
                 "comment_count" : 1,
                 "like_count" : 1,
                 "user_liked" : 1,
-                "name_color" : "$user_record.name_color",
-                "username" : "$user_record.username",
-                "picture_name" : "$user_record.picture_name",
+                "name_color" : user_record["name_color"],
+                "username" : user_record["username"],
+                "picture_name" : user_record["picture_name"],
                 "date" : 1,
                 "circle" : 1,
                 "_id" : 0,
