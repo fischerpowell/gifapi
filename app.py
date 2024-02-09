@@ -181,6 +181,7 @@ def get_feed(last_id):
     session_user_id = 1
 
 
+
     user_record = user_db.find_one({"user_id" : session_user_id})
 
     last_id = int(last_id)
@@ -197,11 +198,22 @@ def get_feed(last_id):
                 "$expr" : {"$in" : ["$user_id", user_record["circles"]]},
                 "$expr" : {"$lt" : ["$date", date]}
             }
-        
     
 
 
     pipeline = [
+
+        {
+            "$lookup" : {
+                "from" : "users",
+                "localField" : "user_id",
+                "foreignField" : "user_id",
+                "as" : "user_record",
+            }
+        },
+        {
+            "$unwind" : "$user_record"
+        },
 
         {
             "$match" : match
@@ -251,9 +263,9 @@ def get_feed(last_id):
                 "comment_count" : 1,
                 "like_count" : 1,
                 "user_liked" : 1,
-                "name_color" : user_record["name_color"],
-                "username" : user_record["username"],
-                "picture_name" : user_record["picture_name"],
+                "name_color" : "$user_record.name_color",
+                "username" : "$user_record.username",
+                "picture_name" : "$user_record.picture_name",
                 "date" : 1,
                 "circle" : 1,
                 "_id" : 0,
@@ -267,14 +279,14 @@ def get_feed(last_id):
 
 
 
-    # post_url = post_cache.get_link(post_data["image_name"])
+    post_url = post_cache.get_link(post_data["image_name"])
 
 
-    # picture_url = user_cache.get_link(post_data["picture_name"])
+    picture_url = user_cache.get_link(post_data["picture_name"])
 
-    # post_data["post_url"] = post_url
+    post_data["post_url"] = post_url
 
-    # post_data["picture_url"] = picture_url
+    post_data["picture_url"] = picture_url
 
 
     return jsonify(post_data)
