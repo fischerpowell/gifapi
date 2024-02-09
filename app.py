@@ -278,15 +278,15 @@ def get_feed(last_id):
     post_data = list(post_db.aggregate(pipeline))
 
 
+    for post_dict in post_data:
+        post_url = post_cache.get_link(post_dict["image_name"])
 
-    post_url = post_cache.get_link(post_data["image_name"])
 
+        picture_url = user_cache.get_link(post_dict["picture_name"])
 
-    picture_url = user_cache.get_link(post_data["picture_name"])
+        post_dict["post_url"] = post_url
 
-    post_data["post_url"] = post_url
-
-    post_data["picture_url"] = picture_url
+        post_dict["picture_url"] = picture_url
 
 
     return jsonify(post_data)
