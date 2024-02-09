@@ -176,6 +176,144 @@ def get_post(post_id):
 
     return jsonify(post_data)
 
+@app.route("/feed/<last_id>")
+def get_feed(last_id):
+    session_user_id = 1
+
+
+    last_id = int(last_id)
+    if last_id == 0:
+        match = {
+            "$expr" : {"$in" : ["$user_id", "$user_record.circles"]},
+
+
+            }
+    else:
+        date = post_db.find_one({"post_id" : last_id})["date"]
+        print(date)
+        match = {
+                "$expr" : {"$in" : ["$user_id", "$user_record.circles"]},
+                "$expr" : {"$lt" : ["$date", date]}
+            }
+        
+    
+
+
+    pipeline = [
+
+        {
+            "$lookup" : {
+                "from" : "users",
+                "localField" : "user_id",
+                "foreignField" : "user_id",
+                "as" : "user_record",
+            }
+        },
+        {
+            "$unwind" : "$user_record"
+        },
+        # {
+        #     "$lookup" : {
+        #         "from" : "posts",
+        #         "localField" : "post_id",
+        #         "foreignField" : "post_id",
+        #         "pipeline" : [
+        #             {"$match" : {
+        #                 "post_id" : last_id
+        #             }
+        #             },
+        #             {
+        #                 "$project" : {
+        #                     "_id" : 0,
+        #                 }
+        #             }
+        #         ],
+        #         "as" : "last_post",
+        #     }
+        # },
+
+        # {
+        #     "$unwind" : {"path" : "$last_post",
+        #                  "preserveNullAndEmptyArrays" : True},
+            
+        # },
+
+        {
+            "$match" : match
+        },
+
+
+
+        {
+            "$sort" : {
+                "date" : -1
+            }
+        },
+        {
+            "$limit" : 10
+        },
+
+
+
+        {
+            "$addFields" : {
+                "comment_count" : {
+                    "$size" : "$comments"
+                },
+                "user_liked" : {
+                    "$in" : [session_user_id, "$likes"]
+                },
+                "like_count" : {
+                    "$size" : "$likes"
+                },
+
+                    # "last_post" : "$last_post"
+
+            },
+
+        },
+        {
+            "$project" : {
+                # "last_post" : 1,
+                "post_id" : 1,
+                "user_id" : 1,
+                "width" : 1,
+                "height" : 1,
+                "image_name" : 1,
+                "title" : 1,
+                "caption" : 1,
+                "tags" : 1,
+                "comment_count" : 1,
+                "like_count" : 1,
+                "user_liked" : 1,
+                "name_color" : "$user_record.name_color",
+                "username" : "$user_record.username",
+                "picture_name" : "$user_record.picture_name",
+                "date" : 1,
+                "circle" : 1,
+                "_id" : 0,
+
+            }
+        },
+
+    ]
+
+    post_data = list(post_db.aggregate(pipeline))
+
+
+
+    # post_url = post_cache.get_link(post_data["image_name"])
+
+
+    # picture_url = user_cache.get_link(post_data["picture_name"])
+
+    # post_data["post_url"] = post_url
+
+    # post_data["picture_url"] = picture_url
+
+
+    return jsonify(post_data)
+
 if __name__ == "__main__":
 
     app.run(host="127.0.0.1", port=8000)
