@@ -3,3 +3,4 @@ Gunicorn
 boto3
 python-dotenv
 pymongo[srv]
+Flask-Limiter
