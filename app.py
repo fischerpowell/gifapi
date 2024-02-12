@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 import os
 from dotenv import load_dotenv
 import boto3
@@ -6,6 +6,8 @@ from botocore.client import Config
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 import datetime
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 
 load_dotenv()
@@ -19,7 +21,7 @@ AWS_USERBUCKET = os.environ.get("AWS_USERBUCKET")
 MONGO_USER = os.environ.get("MONGO_USER")
 MONGO_PW = os.environ.get("MONGO_PW")
 
-
+session_user_id = 1
 
 class CachedLink:
     def __init__(self, link, created):
@@ -93,14 +95,21 @@ app = Flask(__name__)
 post_cache = LinkCache(100, AWS_GIFBUCKET)
 user_cache = LinkCache(100, AWS_USERBUCKET)
 
+limiter = Limiter(get_remote_address, app=app)
+
+def get_request_id():
+    return request.path
+
 @app.route('/')
+@limiter.limit("5 per minute", key_func=get_request_id)
 def main_index():
     return 'Hi Jake'
 
 
 @app.route("/post/<post_id>")
+@limiter.limit("30 per minute", key_func=get_request_id)
 def get_post(post_id):
-    session_user_id = 1
+
 
     post_id = int(post_id)
 
@@ -177,8 +186,8 @@ def get_post(post_id):
     return jsonify(post_data)
 
 @app.route("/feed/<last_id>")
+@limiter.limit("15 per minute", key_func=get_request_id)
 def get_feed(last_id):
-    session_user_id = 1
 
 
 
@@ -290,6 +299,28 @@ def get_feed(last_id):
 
 
     return jsonify(post_data)
+
+@app.route("/like/<post_id>")
+@limiter.limit("6 per minute", key_func=get_request_id)
+def like_post(post_id):
+
+    post_id = int(post_id)
+    post_db.update_one({"post_id" : post_id}, 
+                       {"$addToSet" : {"likes" : session_user_id}})
+    
+    return jsonify([{"status" : True}])
+
+@app.route("/unlike/<post_id>")
+@limiter.limit("6 per minute", key_func=get_request_id)
+def unlike_post(post_id):
+
+    post_id = int(post_id)
+
+    post_db.update_one({"post_id" : post_id}, {"$pull" : {"likes" : session_user_id}})
+
+    return jsonify([{"status" : True}])
+
+
 
 if __name__ == "__main__":
 
